@@ -4,6 +4,7 @@ from binance.client import Client
 import configparser
 import os
 
+# 已建立關閉按鈕
 
 def is_valid_price(price):
     try:
@@ -24,6 +25,7 @@ def set_api():
         show_trade_window()
     except Exception as error:
         messagebox.showerror("ERROR", f"{error}")
+        api_window.destroy()
 
 def show_trade_window():
     def confirm():
@@ -71,6 +73,9 @@ def show_trade_window():
 
         print(f"最高價: {high_price}, 最低價: {low_price}, 網格數: {grid_num}, 投入金額: {price}")
 
+    def close_main():
+        root.destroy()
+
     root = tk.Tk()
     root.title("交易參數設置")
     root.geometry("640x480")
@@ -96,9 +101,13 @@ def show_trade_window():
     price_entry = tk.Entry(root, font=("Arial", 14))
     price_entry.place(x=150, y=200, width=200)
 
-    # 建立確認和設置API按鈕
+    # 建立確認按鈕
     confirm_button = tk.Button(root, text="確認", command=confirm, font=("Arial", 14))
     confirm_button.place(x=150, y=300, width=100, height=40)
+
+    # 建立關閉按鈕
+    exit_button = tk.Button(root, text="關閉", command=close_main, font=("Arial", 14))
+    exit_button.place(x=400, y=300, width=100, height=40)
 
     root.mainloop()
 
@@ -139,5 +148,6 @@ def show_api_window():
     api_window.mainloop()
 
 
-# 首先顯示API設置視窗
-show_api_window()
+if __name__ == "__main__":
+    # 首先顯示API設置視窗
+    show_api_window()
