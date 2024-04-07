@@ -1,10 +1,14 @@
 import tkinter as tk
 from tkinter import messagebox
 from binance.client import Client
+from binance.spot import Spot
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from datetime import datetime
 import configparser
+import sys
 import os
 
-# 已建立關閉按鈕
 
 def is_valid_price(price):
     try:
@@ -17,15 +21,17 @@ def is_valid_price(price):
 def set_api():
     api_key = api_key_entry.get()
     api_secret = api_secret_entry.get()
-    client = Client(api_key, api_secret)
+    client = Client(api_key, api_secret)  # 連接到網路
     try:
         account_info = client.get_account()
         print("成功連接到 Binance API!")
-        api_window.destroy()
-        show_trade_window()
+        api_window.withdraw()  # 隱藏窗口
+        api_window.quit()  # 結束事件循環
+        return account_info
     except Exception as error:
         messagebox.showerror("ERROR", f"{error}")
-        api_window.destroy()
+        sys.exit()
+
 
 def show_trade_window():
     def confirm():
@@ -73,9 +79,6 @@ def show_trade_window():
 
         print(f"最高價: {high_price}, 最低價: {low_price}, 網格數: {grid_num}, 投入金額: {price}")
 
-    def close_main():
-        root.destroy()
-
     root = tk.Tk()
     root.title("交易參數設置")
     root.geometry("640x480")
@@ -101,15 +104,98 @@ def show_trade_window():
     price_entry = tk.Entry(root, font=("Arial", 14))
     price_entry.place(x=150, y=200, width=200)
 
+    # 建立顯示價格按鈕
+    price_button = tk.Button(root, text="查詢幣價", command=show_currencyprice_window, font=("Arial", 14))
+    price_button.place(x=300, y=370, width=100, height=40)
+
+    # 建立顯示價格按鈕
+    assets_button = tk.Button(root, text="查詢資產", command=show_assets_window, font=("Arial", 14))
+    assets_button.place(x=300, y=300, width=100, height=40)
+
     # 建立確認按鈕
     confirm_button = tk.Button(root, text="確認", command=confirm, font=("Arial", 14))
     confirm_button.place(x=150, y=300, width=100, height=40)
 
     # 建立關閉按鈕
-    exit_button = tk.Button(root, text="關閉", command=close_main, font=("Arial", 14))
-    exit_button.place(x=400, y=300, width=100, height=40)
+    exit_button = tk.Button(root, text="關閉", command=sys.exit, font=("Arial", 14))
+    exit_button.place(x=450, y=300, width=100, height=40)
 
     root.mainloop()
+
+
+def show_currencyprice_window():
+    def get_currency():
+        currency = currency_entry.get().upper() + "USDT"
+        client = Spot()  # 創建客戶端對
+        try:  # 嘗試獲取該貨幣的 k 線數據，如果成功則跳出迴圈，否則提示用戶重新輸入
+            klines = client.klines(currency, "1h", limit=10)
+
+            # 建立一個新的 figure 顯示目前價格
+            plt.figure(currency)
+            plt.title(f'Currency: {currency}')
+            plt.ylabel('USDT')
+
+            # 提取時間和收盤價
+            times = [kline[0] for kline in klines]
+            prices = [float(kline[4]) for kline in klines]  # 收盤價在第5個位置，索引為4
+            # 將時間戳轉換為日期
+            dates = [datetime.fromtimestamp(time / 1000) for time in times]
+            # 繪製線圖
+            plt.plot_date(dates, prices, linestyle='solid')
+            # 美化日期標籤
+            plt.gcf().autofmt_xdate()
+            date_format = mdates.DateFormatter('%H:%M')
+            plt.gca().xaxis.set_major_formatter(date_format)
+            plt.show()  # 顯示圖表
+
+        except Exception:
+            messagebox.showerror("錯誤", "無效的貨幣名稱。請再試一次。")
+
+    # 創建新的窗口
+    price_window = tk.Tk()
+    price_window.title("Choose Currency")
+    price_window.geometry("400x200")
+
+    # 建立標籤和輸入欄位
+    currency_label = tk.Label(price_window, text="Choose Currency:", font=("Arial", 14))
+    currency_label.place(x=50, y=50)
+    currency_entry = tk.Entry(price_window, font=("Arial", 14))
+    currency_entry.place(x=220, y=50, width=100)
+    currency_entry.insert(0, "BTC")
+
+    # 建立確認按鈕
+    confirm_button = tk.Button(price_window, text="確認", command=get_currency, font=("Arial", 14))
+    confirm_button.place(x=150, y=150, width=100, height=40)
+
+    price_window.mainloop()
+
+
+def show_assets_window():
+    account_info = set_api()
+
+    print("帳戶信息:", account_info)
+    count = 0  # 計數幣種順序
+    assets = []
+    balances = []
+    for balance in account_info['balances']:
+        asset = balance['asset']
+        free = float(balance['free'])  # 轉換為浮點數
+        locked = float(balance['locked'])  # 轉換為浮點數
+        total = free + locked
+        if total > 0:
+            count += 1
+            asset = str(count) + "." + asset  # 用於標識幣種
+            # 將資產名稱和總餘額添加到相應的列表中
+            assets.append(asset)
+            balances.append(total)
+            print(count, ".", f"幣種: {asset}, 可用餘額: {free}, 鎖定餘額: {locked}")
+
+    # 建立一個新的 figure
+    plt.figure(num="Asset Balances")
+    # 繪製鎖所持資產長條圖
+    plt.pie(balances, labels=assets, autopct='%1.1f%%')
+    plt.title('Asset Balances')
+    plt.show()  # 顯示圖表
 
 
 def show_api_window():
@@ -151,3 +237,4 @@ def show_api_window():
 if __name__ == "__main__":
     # 首先顯示API設置視窗
     show_api_window()
+    show_trade_window()
