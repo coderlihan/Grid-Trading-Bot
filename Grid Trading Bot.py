@@ -54,12 +54,9 @@ def show_trade_window():
         else:
             low_label.config(fg="black")
 
-        if not is_valid_price(price):
-            price_label.config(fg="red")
-            messagebox.showerror("錯誤", "投入金額輸入錯誤")
+        if low_price >= high_price:
+            messagebox.showerror("錯誤", "價格填寫錯誤")
             return
-        else:
-            price_label.config(fg="black")
 
         if not grid_num.isdigit():
             grid_label.config(fg="red")
@@ -68,14 +65,17 @@ def show_trade_window():
         else:
             grid_label.config(fg="black")
 
+        if not is_valid_price(price):
+            price_label.config(fg="red")
+            messagebox.showerror("錯誤", "投入金額輸入錯誤")
+            return
+        else:
+            price_label.config(fg="black")
+
         high_price = float(high_price)
         low_price = float(low_price)
         price = float(price)
         grid_num = int(grid_num)
-
-        if low_price >= high_price:
-            messagebox.showerror("錯誤", "投入金額填寫錯誤")
-            return
 
         print(f"最高價: {high_price}, 最低價: {low_price}, 網格數: {grid_num}, 投入金額: {price}")
 
