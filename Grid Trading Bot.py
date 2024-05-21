@@ -10,24 +10,101 @@ import sys
 import os
 
 
-def is_valid_price(price):
-    try:
-        price = float(price)
-        return True
-    except ValueError:
+def check_value(high_entry, high_label, low_entry, low_label, grid_entry, grid_label, price_entry, price_label):
+    def is_valid(val, allow_zero=True):
+        try:
+            val = float(val)
+            if val >= 0 and (val > 0 or allow_zero):
+                return True
+            else:
+                return False
+        except ValueError:
+            return False
+
+    def validate_and_convert(entry, label, error_message, allow_zero=True):
+        value = entry.get()
+        if not is_valid(value, allow_zero):
+            label.config(fg="red")
+            messagebox.showerror("錯誤", error_message)
+            return None
+        else:
+            label.config(fg="black")
+            return float(value)
+
+    high_price = validate_and_convert(high_entry, high_label, "最高價輸入錯誤")
+    if high_price is None:
         return False
+
+    low_price = validate_and_convert(low_entry, low_label, "最低價輸入錯誤")
+    if low_price is None:
+        return False
+
+    if low_price >= high_price:
+        messagebox.showerror("錯誤", "價格填寫錯誤")
+        high_label.config(fg="red")
+        low_label.config(fg="red")
+        return False
+
+    grid_num = validate_and_convert(grid_entry, grid_label, "網格數輸入錯誤", allow_zero=False)
+    if grid_num is None:
+        return False
+
+    price = validate_and_convert(price_entry, price_label, "投入金額輸入錯誤", allow_zero=False)
+    if price is None:
+        return False
+
+    checkerboard = messagebox.askyesno("下單確認",
+                                       f"最高價: {high_price} \n最低價: {low_price} \n網格數: {grid_num} \n投入金額: {price}")
+    return checkerboard
+
+
+#尚未修改完成
+def order(high_entry, low_entry, grid_entry, price_entry):
+    high_price = float(high_entry.get())
+    low_price = float(low_entry.get())
+    grid_num = int(grid_entry.get())
+    total_amount = float(price_entry.get())
+    symbol = "BTCUSDT"
+    grid_price = (high_price - low_price) / grid_num  # 每個網格的價格區間
+    grid_amount = total_amount / grid_num  # 每個網格的投入金額
+
+    for i in range(grid_num):
+        # 計算每個網格的買賣價
+        buy_price = low_price + grid_price * i
+        sell_price = buy_price + grid_price
+
+        # 計算每個網格的買賣量
+        buy_quantity = round(grid_amount / buy_price,   2)
+        sell_quantity = round(grid_amount / sell_price, 2)
+        print(f"Buy Price: {buy_price}, Buy Quantity: {buy_quantity}")
+        # 下達買賣單
+        try:
+            buy_order = client.order_limit_buy(
+                symbol=symbol,
+                quantity=buy_quantity,
+                price="{:.8f}".format(buy_price)  # 使用8位小數點格式化價格
+            )
+            print(f"Buy Order: {buy_order}")
+            sell_order = client.order_limit_sell(
+                symbol=symbol,
+                quantity=sell_quantity,
+                price="{:.8f}".format(sell_price)  # 使用8位小數點格式化價格
+            )
+            print(f"Sell Order: {sell_order}")
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
 
 def set_api():
+    global client
     api_key = api_key_entry.get()
     api_secret = api_secret_entry.get()
-    client = Client(api_key, api_secret)  # 連接到網路
+    client = Client(api_key, api_secret)
     try:
         account_info = client.get_account()
-        print("成功連接到 Binance API!")
         api_window.withdraw()  # 隱藏窗口
         api_window.quit()  # 結束事件循環
-        return account_info
+        return account_info, True
     except Exception as error:
         messagebox.showerror("ERROR", f"{error}")
         sys.exit()
@@ -35,49 +112,8 @@ def set_api():
 
 def show_trade_window():
     def confirm():
-        high_price = high_entry.get()
-        low_price = low_entry.get()
-        grid_num = grid_entry.get()
-        price = price_entry.get()
-
-        if not is_valid_price(high_price):
-            high_label.config(fg="red")
-            messagebox.showerror("錯誤", "最高價輸入錯誤")
-            return
-        else:
-            high_label.config(fg="black")
-
-        if not is_valid_price(low_price):
-            low_label.config(fg="red")
-            messagebox.showerror("錯誤", "最低價輸入錯誤")
-            return
-        else:
-            low_label.config(fg="black")
-
-        if low_price >= high_price:
-            messagebox.showerror("錯誤", "價格填寫錯誤")
-            return
-
-        if not grid_num.isdigit():
-            grid_label.config(fg="red")
-            messagebox.showerror("錯誤", "網格數輸入錯誤")
-            return
-        else:
-            grid_label.config(fg="black")
-
-        if not is_valid_price(price):
-            price_label.config(fg="red")
-            messagebox.showerror("錯誤", "投入金額輸入錯誤")
-            return
-        else:
-            price_label.config(fg="black")
-
-        high_price = float(high_price)
-        low_price = float(low_price)
-        price = float(price)
-        grid_num = int(grid_num)
-
-        print(f"最高價: {high_price}, 最低價: {low_price}, 網格數: {grid_num}, 投入金額: {price}")
+        if check_value(high_entry, high_label, low_entry, low_label, grid_entry, grid_label, price_entry, price_label):
+            order(high_entry, low_entry, grid_entry, price_entry)
 
     root = tk.Tk()
     root.title("交易參數設置")
@@ -171,7 +207,7 @@ def show_currencyprice_window():
 
 
 def show_assets_window():
-    account_info = set_api()
+    account_info, _ = set_api()
 
     print("帳戶信息:", account_info)
     count = 0  # 計數幣種順序
@@ -192,9 +228,10 @@ def show_assets_window():
 
     # 建立一個新的 figure
     plt.figure(num="Asset Balances")
-    # 繪製鎖所持資產長條圖
+    # 繪製鎖所持資產的圓餅圖
     plt.pie(balances, labels=assets, autopct='%1.1f%%')
     plt.title('Asset Balances')
+    plt.show(block=False)
     plt.show()  # 顯示圖表
 
 
@@ -237,4 +274,7 @@ def show_api_window():
 if __name__ == "__main__":
     # 首先顯示API設置視窗
     show_api_window()
-    show_trade_window()
+    account_info, api_success = set_api()
+    if api_success:
+        print("成功連接到 Binance API!")
+        show_trade_window()
